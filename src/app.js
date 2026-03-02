@@ -1,7 +1,8 @@
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { token, host } from './config.js'
+import { host } from './config.js'
+import { ensureCookies, getCookieHeaderForRequest, setCookiesFromUser } from './cookies.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -18,8 +19,10 @@ app.get('/chat', (req, res) => {
 
 app.get('/api/user', async (req, res) => {
   try {
+    await ensureCookies()
+    const cookieHeader = getCookieHeaderForRequest()
     const response = await fetch(`${host}/api/auth/session`, {
-      headers: { Cookie: token },
+      headers: cookieHeader ? { Cookie: cookieHeader } : {},
     })
     const session = await response.json()
     if (!session?.user) {
@@ -35,11 +38,13 @@ app.get('/api/user', async (req, res) => {
 
 app.post('/api/chat/stream', async (req, res) => {
   try {
-    console.log(req.body)
+    await ensureCookies()
+    const cookieHeader = getCookieHeaderForRequest()
     const response = await fetch(`${host}/api/chat`, {
       method: 'POST',
       headers: {
-        Cookie: token,
+        ...(cookieHeader && { Cookie: cookieHeader }),
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(req.body),
     })
@@ -69,10 +74,13 @@ app.post('/api/chat/stream', async (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   try {
+    await ensureCookies()
+    const cookieHeader = getCookieHeaderForRequest()
     const response = await fetch(`${host}/api/chat`, {
       method: 'POST',
       headers: {
-        Cookie: token,
+        ...(cookieHeader && { Cookie: cookieHeader }),
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(req.body),
     })
@@ -97,7 +105,21 @@ app.post('/api/chat', async (req, res) => {
   }
 })
 
+/** Accept user-provided cookie string (e.g. pasted from browser DevTools) and use for melong.ai requests */
+app.post('/api/cookies', async (req, res) => {
+  try {
+    const { cookies } = req.body
+    if (typeof cookies !== 'string' || !cookies.trim()) {
+      return res.status(400).json({ error: 'Body must include { "cookies": "name=value; ..." }' })
+    }
+    await setCookiesFromUser(cookies.trim())
+    return res.json({ ok: true })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
 
-app.listen(3000, () => {
+app.listen(3000, async () => {
+  await ensureCookies()
   console.log('Server is running on http://localhost:3000')
 })

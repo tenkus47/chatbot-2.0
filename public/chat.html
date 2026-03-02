@@ -273,7 +273,7 @@
       chatIdStatus.classList.toggle('missing', !val)
     }
 
-    let conversationId = uuid()
+    let conversationId = getStoredChatId() || uuid()
     setConversationId(conversationId)
 
     function showError(msg) {
