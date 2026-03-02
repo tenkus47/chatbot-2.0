@@ -2,5 +2,6 @@
 
 clone the repo and do this:
 
-npm i
-npm run dev
+- npm i
+- npm run dev
+
